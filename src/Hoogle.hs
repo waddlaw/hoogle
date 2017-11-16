@@ -28,6 +28,9 @@ import Action.Test
 newtype Database =
   Database StoreRead
 
+createDatabase :: FilePath -> IO Database
+createDatabase filepath = Database <$> createStoreReadFile filepath
+
 -- | Load a database from a file.
 withDatabase :: NFData a => FilePath -> (Database -> IO a) -> IO a
 withDatabase file act = storeReadFile file $ act . Database
