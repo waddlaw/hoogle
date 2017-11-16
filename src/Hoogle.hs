@@ -48,7 +48,7 @@ hoogle :: [String] -> IO ()
 hoogle args = do
   args <- getCmdLine args
   case args of
-    Search {} -> actionSearch args
+    Search {} -> actionSearch' args >>= print
     Generate {} -> actionGenerate args
     Server {} -> actionServer args
     Test {} -> actionTest args

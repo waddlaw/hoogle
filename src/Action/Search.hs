@@ -3,6 +3,7 @@
 
 module Action.Search
   ( actionSearch
+  , actionSearch'
   , withSearch
   , search
   , targetInfo
@@ -32,6 +33,11 @@ import Query
 -- @tagsoup -- generate tagsoup
 -- @tagsoup filter -- search the tagsoup package
 -- filter -- search all
+actionSearch' :: CmdLine -> IO [Target]
+actionSearch' Search {..} =
+  withSearch database $ \store -> do
+    (_, res) <- return $ search store $ parseQuery $ unwords query
+    return res
 
 actionSearch :: CmdLine -> IO ()
 actionSearch Search {..} =
