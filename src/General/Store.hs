@@ -219,8 +219,44 @@ createStoreReadFile file =
       decodeBS <$> BS.unsafePackCStringLen (plusPtr ptr $ len - verN - intSize - atomSize, atomSize)
     return $ StoreRead file len ptr atoms
 
-storeReadFile :: FilePath -> (StoreRead -> IO a) -> IO a
-storeReadFile file act = createStoreReadFile file >>= act
+storeReadFile :: NFData a => FilePath -> (StoreRead -> IO a) -> IO a
+storeReadFile file act =
+  mmapWithFilePtr file ReadOnly Nothing $ \(ptr, len) ->
+    strict $
+    -- check is longer than my version string
+     do
+      when (len < (BS.length verString * 2) + intSize) $
+        error $ "The Hoogle file " ++ file ++ " is corrupt, only " ++ show len ++ " bytes."
+      let verN = BS.length verString
+      verEnd <- BS.unsafePackCStringLen (plusPtr ptr $ len - verN, verN)
+      when (verString /= verEnd) $ do
+        verStart <- BS.unsafePackCStringLen (plusPtr ptr 0, verN)
+        if verString /= verStart
+          then error $
+               "The Hoogle file " ++
+               file ++
+               " is the wrong version or format.\n" ++
+               "Expected: " ++
+               trim (BS.unpack verString) ++
+               "\n" ++
+               "Got     : " ++
+               map
+                 (\x ->
+                    if isAlphaNum x || x `elem` "_-. "
+                      then x
+                      else '?')
+                 (trim $ BS.unpack verStart)
+          else error $
+               "The Hoogle file " ++
+               file ++ " is truncated, probably due to an error during creation."
+      atomSize <-
+        intFromBS <$> BS.unsafePackCStringLen (plusPtr ptr $ len - verN - intSize, intSize)
+      when (len < verN + intSize + atomSize) $
+        error $ "The Hoogle file " ++ file ++ " is corrupt, couldn't read atom table."
+      atoms <-
+        decodeBS <$>
+        BS.unsafePackCStringLen (plusPtr ptr $ len - verN - intSize - atomSize, atomSize)
+      act $ StoreRead file len ptr atoms
 
 storeRead :: (Typeable (t a), Typeable a, Stored a) => StoreRead -> t a -> a
 storeRead = storedRead
